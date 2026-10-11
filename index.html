@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="application-name" content="Prompductor">
+<meta name="description" content="Prompductor - Suno/Udio prompt olusturucu">
+<title>Prompductor</title>
+<style>
+  * { font-weight: normal; font-style: normal; box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #000000; color: #e0e0e0; font-family: Arial, Helvetica, sans-serif; font-size: 18px; line-height: 1.6; }
+  body { min-height: 100vh; padding: 20px 16px 40px; }
+  main { max-width: 960px; margin: 0 auto; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .brand { font-size: 1.9em; letter-spacing: 0.06em; color: #e0e0e0; margin: 0; line-height: 1.2; }
+  .tagline { color: #999999; margin: 2px 0 0 0; font-size: 0.95em; }
+  .lang { display: inline-flex; border: 1px solid #262626; border-radius: 10px; overflow: hidden; background: #0d0d0d; }
+  .lang button { min-width: 72px; min-height: 52px; border: 0; border-radius: 0; background: #0d0d0d; color: #999999; font-size: 1em; padding: 12px 18px; }
+  .lang button[aria-pressed="true"] { background: #3a2c00; color: #ffd84a; box-shadow: inset 0 -4px 0 #ffb800; }
+  .lang button:hover:not([aria-pressed="true"]) { background: #1c1c1c; }
+  .stepper { display: flex; justify-content: space-between; gap: 6px; margin: 6px 0 18px 0; padding: 0; list-style: none; }
+  .stepper li { flex: 1; text-align: center; color: #666666; font-size: 0.85em; padding: 10px 2px; border-bottom: 3px solid #1c1c1c; }
+  .stepper li .n { display: block; font-size: 1.1em; color: #666666; }
+  .stepper li.done { color: #d9a400; border-bottom-color: #6b5210; }
+  .stepper li.current { color: #ffd84a; border-bottom-color: #ffd84a; }
+  .stepper li.current .n { color: #ffd84a; }
+  .progress-text { color: #999999; font-size: 0.92em; text-align: center; margin: 0 0 10px 0; }
+  h2 { font-size: 1.15em; color: #e0e0e0; margin: 0 0 12px 0; }
+  .muted { color: #999999; margin: 4px 0 8px 0; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  #stage { position: relative; }
+  .step { display: none; }
+  .step.active { display: block; animation: step-in 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes step-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .card { background: #0d0d0d; border: 1px solid #262626; border-radius: 10px; padding: 16px; margin-top: 12px; transition: background 0.28s ease, border-color 0.28s ease; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }
+  .pair > .card { margin-top: 0; }
+  .top-bar { display: flex; justify-content: flex-start; margin-bottom: 6px; }
+  button { font-family: inherit; font-size: 1em; padding: 12px 18px; min-height: 52px; background: #141414; color: #e0e0e0; border: 1px solid #262626; border-radius: 10px; cursor: pointer; transition: background 0.28s ease, border-color 0.28s ease, color 0.2s ease; }
+  button:hover:not(:disabled) { background: #1c1c1c; border-color: #3a3a3a; }
+  button:focus-visible { outline: 3px solid #ffb800; outline-offset: 2px; }
+  button:disabled { color: #6b6b6b; cursor: not-allowed; border-color: #1c1c1c; }
+  .icon { display: inline-block; width: 1.2em; text-align: center; margin-right: 6px; color: #999999; }
+  .btn-lg { min-height: 56px; min-width: 220px; font-size: 1.1em; background: #1a1a1a; border-color: #5a5a5a; }
+  .btn-lg:hover:not(:disabled) { background: #242424; border-color: #6a6a6a; }
+  .next-wrap { display: flex; justify-content: center; margin-top: 18px; }
+  .next-btn[hidden] { display: none; }
+  svg.check { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: #ffd84a; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+  .dd-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; background: #141414; min-height: 60px; padding: 12px 16px; }
+  .dd-text { display: flex; flex-direction: column; min-width: 0; }
+  .dd-cap { color: #999999; font-size: 0.85em; }
+  .dd-value { color: #e0e0e0; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .dd-arrow { color: #999999; flex-shrink: 0; display: inline-block; transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+  .dd-toggle[aria-expanded="true"] { background: var(--open-bg); border-color: var(--open-border); }
+  .dd-toggle[aria-expanded="true"] .dd-arrow { transform: rotate(180deg); }
+  .dd-toggle.is-selected[aria-expanded="false"] { background: #3a2c00; border: 2px solid #ffb800; box-shadow: inset 5px 0 0 #ffd84a; }
+  .dd-toggle.is-selected[aria-expanded="false"] .dd-value { color: #ffd84a; }
+  .dd-toggle.is-selected[aria-expanded="false"] .dd-cap { color: #ffcc33; }
+  .dd-toggle.is-selected[aria-expanded="false"] .dd-arrow { color: #ffd84a; }
+  .dd-toggle:disabled .dd-value, .dd-toggle:disabled .dd-cap { color: #6b6b6b; }
+  .dd-panel { display: grid; grid-template-rows: 0fr; opacity: 0; transform: translateY(-4px); transition: grid-template-rows 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 10px; }
+  .dd-panel.open { grid-template-rows: 1fr; opacity: 1; transform: translateY(0); }
+  .dd-inner { min-height: 0; overflow: hidden; border-radius: 10px; }
+  .dd-panel.open .dd-inner { border: 1px solid var(--open-border); background: var(--open-bg); max-height: 380px; overflow-y: auto; }
+  .opt-list { list-style: none; margin: 0; padding: 0; }
+  .opt-list li + li { border-top: 1px solid var(--row-sep, #1c1c1c); }
+  .opt { width: 100%; text-align: left; border: 0; border-radius: 0; background: transparent; padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-height: 56px; }
+  .opt:hover:not(:disabled), .opt:focus-visible { background: #1c1c1c; }
+  .opt[aria-checked="true"] { background: #3a2c00; box-shadow: inset 6px 0 0 #ffd84a; }
+  .opt[aria-checked="true"] .opt-title { color: #ffd84a; }
+  .opt[aria-checked="true"] .opt-desc { color: #ffcc33; }
+  .opt-text { display: block; min-width: 0; }
+  .opt-title { display: block; color: #e0e0e0; }
+  .opt-desc { display: block; color: #999999; font-size: 0.9em; margin-top: 2px; }
+  .opt-check { visibility: hidden; margin-top: 3px; }
+  .opt[aria-checked="true"] .opt-check { visibility: visible; }
+  .sel-line { color: #999999; margin: 10px 0 0 0; }
+  .sel-line.is-set { color: #ffd84a; }
+  .locked-note { color: #999999; font-size: 0.92em; margin: 6px 0 0 0; }
+  .choice-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .choice { width: 100%; text-align: left; padding: 16px; min-height: 72px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #0d0d0d; }
+  .choice[aria-checked="true"] { background: #3a2c00; border: 2px solid #ffb800; box-shadow: inset 6px 0 0 #ffd84a; }
+  .choice[aria-checked="true"] .opt-title { color: #ffd84a; }
+  .choice .opt-check { visibility: hidden; }
+  .choice[aria-checked="true"] .opt-check { visibility: visible; }
+  .status { min-height: 1.5em; color: #999999; margin-top: 14px; text-align: center; }
+  .summary-list { list-style: none; padding: 0; margin: 0; }
+  .summary-list li { padding: 8px 0; border-bottom: 1px solid #1c1c1c; color: #e0e0e0; }
+  .summary-list .k { color: #999999; display: inline-block; min-width: 190px; }
+  #gen-loader { display: none; text-align: center; padding: 40px 12px; }
+  #gen-loader.active { display: block; animation: step-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .bars { display: flex; justify-content: center; align-items: flex-end; gap: 10px; height: 64px; margin-bottom: 20px; }
+  .bars span { display: block; width: 10px; height: 18px; background: #3a3a3a; border-radius: 3px; animation: bar-rise 1.6s ease-in-out infinite; }
+  .bars span:nth-child(2) { animation-delay: 0.2s; background: #444444; }
+  .bars span:nth-child(3) { animation-delay: 0.4s; }
+  .bars span:nth-child(4) { animation-delay: 0.6s; background: #444444; }
+  @keyframes bar-rise { 0%, 100% { height: 18px; opacity: 0.55; } 50% { height: 60px; opacity: 1; } }
+  .loader-text { color: #999999; min-height: 1.6em; }
+  #gen-result { display: none; }
+  #gen-result.active { display: block; animation: step-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .block-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .prompt-label { color: #999999; font-size: 0.92em; margin: 12px 0 6px 0; display: block; }
+  .prompt-box { width: 100%; min-height: 150px; background: #080808; color: #e0e0e0; border: 1px solid #262626; border-radius: 10px; padding: 14px; font-family: Consolas, Menlo, monospace; font-size: 0.95em; line-height: 1.5; resize: vertical; }
+  .prompt-box:focus-visible { outline: 3px solid #ffb800; outline-offset: 2px; }
+  .copy-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 16px; }
+  .copy-row button { min-height: 56px; min-width: 200px; }
+  .copy-btn.copied { background: #3a2c00; border-color: #ffb800; color: #ffd84a; }
+  .action-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 18px; }
+  .action-row button { min-height: 56px; min-width: 220px; }
+  .tone-genre { --open-bg: #0e1713; --open-border: #1a3024; --row-sep: #1a3024; }
+  .tone-tempo { --open-bg: #0e131a; --open-border: #1d2836; --row-sep: #1d2836; }
+  .tone-mood  { --open-bg: #170e17; --open-border: #301a30; --row-sep: #301a30; }
+  .tone-vocal { --open-bg: #17130e; --open-border: #30241a; --row-sep: #30241a; }
+  .tone-fx    { --open-bg: #0e1617; --open-border: #1a2f30; --row-sep: #1a2f30; }
+  .tone-mix   { --open-bg: #170e10; --open-border: #301a1e; --row-sep: #301a1e; }
+  .tone-scen  { --open-bg: #13170e; --open-border: #24301a; --row-sep: #24301a; }
+  .tone-makam { --open-bg: #0e1017; --open-border: #1f2433; --row-sep: #1f2433; }
+  .tone-nota  { --open-bg: #14101a; --open-border: #2a1f38; --row-sep: #2a1f38; }
+  @media (max-width: 520px) {
+    .brand { font-size: 1.5em; }
+    .lang button { min-width: 60px; padding: 12px 12px; }
+    .stepper li { font-size: 0.75em; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .step.active, #gen-loader.active, #gen-result.active, .bars span { animation: none; }
+    .dd-panel, .dd-arrow, .card, button { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div>
+      <h1 class="brand">Prompductor</h1>
+      <p class="tagline" id="tagline"></p>
+    </div>
+    <div class="lang" role="group" aria-label="Dil / Language">
+      <button type="button" id="lang-tr" aria-pressed="true" lang="tr">TR</button>
+      <button type="button" id="lang-en" aria-pressed="false" lang="en">EN</button>
+    </div>
+  </div>
+  <ol class="stepper" id="stepper"></ol>
+  <p class="progress-text" id="progress" aria-live="polite"></p>
+  <div id="stage">
+    <section class="step active" id="s1" aria-labelledby="s1-title">
+      <div class="card tone-genre" id="genre-card">
+        <h2 id="s1-title" tabindex="-1"><span class="icon" aria-hidden="true">&#9834;</span><span data-i18n="s1title"></span></h2>
+        <button type="button" class="dd-toggle" id="genre-toggle" aria-expanded="false" aria-controls="genre-panel">
+          <span class="dd-text"><span class="dd-cap" data-i18n="genreCap"></span><span class="dd-value" id="genre-value"></span></span>
+          <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="dd-panel" id="genre-panel"><div class="dd-inner"><ul class="opt-list" id="genre-list" role="radiogroup" aria-labelledby="s1-title"></ul></div></div>
+      </div>
+      <div class="next-wrap"><button type="button" class="btn-lg next-btn" id="next-1" hidden></button></div>
+    </section>
+    <section class="step" id="s2" aria-labelledby="s2-title">
+      <div class="top-bar"><button type="button" id="back-2"></button></div>
+      <h2 id="s2-title" tabindex="-1"><span class="icon" aria-hidden="true">&#9719;</span><span data-i18n="s2title"></span></h2>
+      <p class="muted" id="s2-summary"></p>
+      <div class="pair">
+        <div class="card tone-tempo" id="tempo-card">
+          <h2 id="tempo-title"><span class="icon" aria-hidden="true">&#9201;</span><span data-i18n="tempoTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="tempo-toggle" aria-expanded="false" aria-controls="tempo-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="tempoCap"></span><span class="dd-value" id="tempo-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="tempo-panel"><div class="dd-inner"><ul class="opt-list" id="tempo-list" role="radiogroup" aria-labelledby="tempo-title"></ul></div></div>
+        </div>
+        <div class="card tone-mood" id="mood-card">
+          <h2 id="mood-title"><span class="icon" aria-hidden="true">&#9680;</span><span data-i18n="moodTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="mood-toggle" aria-expanded="false" aria-controls="mood-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="moodCap"></span><span class="dd-value" id="mood-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="mood-panel"><div class="dd-inner"><ul class="opt-list" id="mood-list" role="radiogroup" aria-labelledby="mood-title"></ul></div></div>
+        </div>
+      </div>
+      <div class="next-wrap"><button type="button" class="btn-lg next-btn" id="next-2" disabled></button></div>
+    </section>
+    <section class="step" id="s3" aria-labelledby="s3-title">
+      <div class="top-bar"><button type="button" id="back-3"></button></div>
+      <h2 id="s3-title" tabindex="-1"><span class="icon" aria-hidden="true">&#9835;</span><span data-i18n="s3title"></span></h2>
+      <div class="card tone-vocal" id="vocal-card">
+        <h2 id="vocal-title"><span class="icon" aria-hidden="true">&#9834;</span><span data-i18n="vocalTitle"></span></h2>
+        <div class="choice-row" role="radiogroup" aria-labelledby="vocal-title">
+          <button type="button" class="choice" id="vocal-yes" role="radio" aria-checked="false">
+            <span class="opt-text"><span class="opt-title" id="vocal-yes-t"></span><span class="opt-desc" id="vocal-yes-d"></span></span>
+            <span class="opt-check" aria-hidden="true"><svg class="check" viewBox="0 0 24 24" focusable="false"><polyline points="4 12 9 17 20 6"></polyline></svg></span>
+          </button>
+          <button type="button" class="choice" id="vocal-no" role="radio" aria-checked="false">
+            <span class="opt-text"><span class="opt-title" id="vocal-no-t"></span><span class="opt-desc" id="vocal-no-d"></span></span>
+            <span class="opt-check" aria-hidden="true"><svg class="check" viewBox="0 0 24 24" focusable="false"><polyline points="4 12 9 17 20 6"></polyline></svg></span>
+          </button>
+        </div>
+        <p class="sel-line" id="vocal-sel" aria-live="polite"></p>
+      </div>
+      <div class="pair">
+        <div class="card tone-vocal" id="vt-card">
+          <h2 id="vt-title"><span class="icon" aria-hidden="true">&#9836;</span><span data-i18n="vtTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="vt-toggle" aria-expanded="false" aria-controls="vt-panel" aria-describedby="vt-note">
+            <span class="dd-text"><span class="dd-cap" data-i18n="vtCap"></span><span class="dd-value" id="vt-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <p class="locked-note" id="vt-note"></p>
+          <div class="dd-panel" id="vt-panel"><div class="dd-inner"><ul class="opt-list" id="vt-list" role="radiogroup" aria-labelledby="vt-title"></ul></div></div>
+        </div>
+        <div class="card tone-fx" id="fx-card">
+          <h2 id="fx-title"><span class="icon" aria-hidden="true">&#10070;</span><span data-i18n="fxTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="fx-toggle" aria-expanded="false" aria-controls="fx-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="fxCap"></span><span class="dd-value" id="fx-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="fx-panel"><div class="dd-inner"><ul class="opt-list" id="fx-list" role="radiogroup" aria-labelledby="fx-title"></ul></div></div>
+        </div>
+      </div>
+      <div class="next-wrap"><button type="button" class="btn-lg next-btn" id="next-3" disabled></button></div>
+    </section>
+    <section class="step" id="s4" aria-labelledby="s4-title">
+      <div class="top-bar"><button type="button" id="back-4"></button></div>
+      <h2 id="s4-title" tabindex="-1"><span class="icon" aria-hidden="true">&#9881;</span><span data-i18n="s4title"></span></h2>
+      <p class="muted" id="s4-note"></p>
+      <div class="pair">
+        <div class="card tone-mix" id="mix-card">
+          <h2 id="mix-title"><span class="icon" aria-hidden="true">&#9881;</span><span data-i18n="mixTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="mix-toggle" aria-expanded="false" aria-controls="mix-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="mixCap"></span><span class="dd-value" id="mix-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="mix-panel"><div class="dd-inner"><ul class="opt-list" id="mix-list" role="radiogroup" aria-labelledby="mix-title"></ul></div></div>
+        </div>
+        <div class="card tone-scen" id="scen-card">
+          <h2 id="scen-title"><span class="icon" aria-hidden="true">&#10026;</span><span data-i18n="scenTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="scen-toggle" aria-expanded="false" aria-controls="scen-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="scenCap"></span><span class="dd-value" id="scen-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="scen-panel"><div class="dd-inner"><ul class="opt-list" id="scen-list" role="radiogroup" aria-labelledby="scen-title"></ul></div></div>
+        </div>
+        <div class="card tone-makam" id="makam-card">
+          <h2 id="makam-title"><span class="icon" aria-hidden="true">&#9790;</span><span data-i18n="makamTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="makam-toggle" aria-expanded="false" aria-controls="makam-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="makamCap"></span><span class="dd-value" id="makam-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="makam-panel"><div class="dd-inner"><ul class="opt-list" id="makam-list" role="radiogroup" aria-labelledby="makam-title"></ul></div></div>
+        </div>
+        <div class="card tone-nota" id="nota-card">
+          <h2 id="nota-title"><span class="icon" aria-hidden="true">&#9839;</span><span data-i18n="notaTitle"></span></h2>
+          <button type="button" class="dd-toggle" id="nota-toggle" aria-expanded="false" aria-controls="nota-panel">
+            <span class="dd-text"><span class="dd-cap" data-i18n="notaCap"></span><span class="dd-value" id="nota-value"></span></span>
+            <span class="dd-arrow" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="dd-panel" id="nota-panel"><div class="dd-inner"><ul class="opt-list" id="nota-list" role="radiogroup" aria-labelledby="nota-title"></ul></div></div>
+        </div>
+      </div>
+      <div class="next-wrap"><button type="button" class="btn-lg next-btn" id="next-4" disabled></button></div>
+    </section>
+    <section class="step" id="s5" aria-labelledby="s5-title">
+      <div class="top-bar"><button type="button" id="back-5"></button></div>
+      <h2 id="s5-title" tabindex="-1"><span class="icon" aria-hidden="true">&#9654;</span><span data-i18n="s5title"></span></h2>
+      <div class="card">
+        <h2 data-i18n="summaryTitle"></h2>
+        <ul class="summary-list" id="summary-list"></ul>
+      </div>
+      <div id="gen-loader" class="card" role="status" aria-live="polite">
+        <span class="sr-only" id="gen-sr"></span>
+        <div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <p class="loader-text" id="loader-text" aria-hidden="true"></p>
+      </div>
+      <div id="gen-result">
+        <div class="card">
+          <div class="block-head">
+            <h2 id="res-title1">Sound Prompt</h2>
+            <button type="button" class="copy-btn" id="copy-sound"></button>
+          </div>
+          <label class="prompt-label" for="out-style" data-i18n="soundLabel"></label>
+          <textarea class="prompt-box" id="out-style" readonly aria-labelledby="res-title1"></textarea>
+        </div>
+        <div class="card">
+          <div class="block-head">
+            <h2 id="res-title2">Lyrics</h2>
+            <button type="button" class="copy-btn" id="copy-lyrics"></button>
+          </div>
+          <label class="prompt-label" for="out-lyrics" data-i18n="lyricsLabel"></label>
+          <textarea class="prompt-box" id="out-lyrics" readonly aria-labelledby="res-title2" style="min-height:300px"></textarea>
+        </div>
+        <div class="copy-row"><button type="button" class="copy-btn" id="copy-all"></button></div>
+        <div class="action-row"><button type="button" id="reset-btn"></button></div>
+      </div>
+    </section>
+  </div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+</main>
+<script>
+(function () {
+  var CHECK = '<svg class="check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="4 12 9 17 20 6"></polyline></svg>';
+
+  // ---------- Ses efektleri (Web Audio API, harici dosya yok) ----------
+  var audioCtx = null;
+  function getCtx() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === "suspended") { audioCtx.resume(); }
+    return audioCtx;
+  }
+  function tone(freq, startOffset, dur, peak, endFreq) {
+    var ctx = getCtx();
+    if (!ctx) return;
+    var t0 = ctx.currentTime + startOffset;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, t0);
+    if (endFreq) { osc.frequency.exponentialRampToValueAtTime(endFreq, t0 + dur); }
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+  var SFX = {
+    menu: function () { tone(520, 0, 0.07, 0.06, 380); },
+    select: function () { tone(660, 0, 0.09, 0.07); tone(880, 0.06, 0.12, 0.05); },
+    step: function () { tone(440, 0, 0.1, 0.08, 620); },
+    copy: function () { tone(784, 0, 0.08, 0.06); tone(1046, 0.09, 0.14, 0.06); }
+  };
+  function play(name) { try { SFX[name](); } catch (e) { } }
+  document.addEventListener("pointerdown", function () { getCtx(); }, { once: true });
+
+  // ---------- Arayuz metinleri ----------
+  var UI = {
+    tr: {
+      tagline: "Bir m\u00fczik tarz\u0131 se\u00e7, ad\u0131m ad\u0131m Suno/Udio promptu olu\u015ftur.",
+      stepLabels: ["T\u00fcr", "Tempo & Mood", "Vokal", "Prod\u00fcksiyon", "Prompt"],
+      progress: function (n) { return "Ad\u0131m " + n + " / 5"; },
+      s1title: "M\u00fczik Kategorileri", genreCap: "T\u00fcr", genreEmpty: "Hen\u00fcz se\u00e7ilmedi",
+      s2title: "Tempo ve Atmosfer", tempoTitle: "Tempo (BPM)", tempoCap: "Tempo", tempoEmpty: "Tempo se\u00e7",
+      moodTitle: "Mood (Ruh Hali)", moodCap: "Mood", moodEmpty: "Mood se\u00e7",
+      s3title: "Vokal ve Teknik Detaylar", vocalTitle: "Vokal Tercihi",
+      vocalYesT: "Vokalli Prod\u00fcksiyon", vocalYesD: "Vokal kayd\u0131 ve vokal teknikleri eklenir",
+      vocalNoT: "Enstr\u00fcmantal / Vokal Yok", vocalNoD: "Yaln\u0131zca m\u00fczik, vokal teknikleri devre d\u0131\u015f\u0131",
+      vocalNone: "Hen\u00fcz vokal tercihi yap\u0131lmad\u0131.", vocalSelYes: "Se\u00e7ildi: Vokalli Prod\u00fcksiyon.", vocalSelNo: "Se\u00e7ildi: Enstr\u00fcmantal / Vokal Yok.",
+      vtTitle: "Vokal Teknikleri", vtCap: "Vokal tekni\u011fi", vtEmpty: "Vokal tekni\u011fi se\u00e7", vtNoteLocked: "\u00d6nce vokal tercihi yap\u0131n.", vtNoteYes: "Bir vokal tekni\u011fi se\u00e7in.", vtNoteNo: "Enstr\u00fcmantal se\u00e7ildi\u011fi i\u00e7in vokal teknikleri gerekmiyor.",
+      fxTitle: "Ekstra Teknik Detay", fxCap: "Teknik detay", fxEmpty: "Teknik detay se\u00e7",
+      s4title: "Prod\u00fcksiyon, Senaryo ve Dizi", s4note: "Mix & Master ve M\u00fczikal Senaryo zorunludur. Makam ve dizi iste\u011fe ba\u011fl\u0131d\u0131r.",
+      mixTitle: "Mix & Master", mixCap: "Mix & Master", scenTitle: "M\u00fczikal Senaryo & Atmosfer", scenCap: "Senaryo",
+      makamTitle: "Makam (Farabi Gamlar\u0131)", makamCap: "Makam (iste\u011fe ba\u011fl\u0131)", notaTitle: "Nota, Solfej & Dizi", notaCap: "Dizi (iste\u011fe ba\u011fl\u0131)",
+      empty: "Se\u00e7ilmedi", selected: "Se\u00e7ildi: ",
+      s5title: "Nihai Prompt", summaryTitle: "Se\u00e7imleriniz",
+      loaderMsgs: ["Prompductor motoru \u00e7al\u0131\u015f\u0131yor...", "Frekanslar ve Farabi gamlar\u0131 kalibre ediliyor...", "Nihai prompt derleniyor..."],
+      genSr: "Prompt haz\u0131rlan\u0131yor...",
+      soundLabel: "Sound Prompt (\u0130ngilizce, tek sat\u0131r)", lyricsLabel: "Lyrics (T\u00fcrk\u00e7e s\u00f6z ve yap\u0131 etiketleri)",
+      copySound: "Sound Prompt'u Kopyala", copyLyrics: "\u015eark\u0131 S\u00f6zlerini Kopyala", copyAll: "T\u00fcm\u00fcn\u00fc Kopyala",
+      copied: "Kopyaland\u0131 \u2714", copyFail: "Kopyalama ba\u015far\u0131s\u0131z oldu. Metni elle se\u00e7ip kopyalayabilirsiniz.",
+      copiedMsg: "Panoya kopyaland\u0131.",
+      reset: "\u21ba S\u0131f\u0131rla / Ba\u015fa D\u00f6n", back: "\u2039 Geri D\u00f6n", next: "\u0130leri \u203a", generate: "Promptu \u00dcret \u203a",
+      needGenre: "L\u00fctfen \u00f6nce bir m\u00fczik tarz\u0131 se\u00e7in.", needTempoMood: "L\u00fctfen tempo ve mood se\u00e7in.",
+      needVocal: "Vokal tercihi, vokal tekni\u011fi (vokalli se\u00e7ildiyse) ve teknik detay se\u00e7imlerini tamamlay\u0131n.",
+      needRequired: "Mix & Master ve M\u00fczikal Senaryo se\u00e7imleri zorunludur.",
+      genreSel: "T\u00fcr se\u00e7ildi: ", genreReady: ". \u0130leri butonu aktif.",
+      tempoSel: "Tempo se\u00e7ildi: ", moodSel: "Mood se\u00e7ildi: ", vtSel: "Vokal tekni\u011fi se\u00e7ildi: ", fxSel: "Teknik detay se\u00e7ildi: ",
+      mixSel: "Mix & Master se\u00e7ildi: ", scenSel: "Senaryo se\u00e7ildi: ", makamSel: "Makam se\u00e7ildi: ", notaSel: "Dizi se\u00e7ildi: ",
+      vocalOnSel: "Vokalli prod\u00fcksiyon se\u00e7ildi. Vokal tekni\u011fi men\u00fcs\u00fc a\u00e7\u0131k.", vocalOffSel: "Enstr\u00fcmantal se\u00e7ildi. Vokal teknikleri devre d\u0131\u015f\u0131.",
+      promptReady: "Prompt haz\u0131r. Sound Prompt ve Lyrics metin alanlar\u0131nda.",
+      resetDone: "Yeni bir par\u00e7a i\u00e7in ba\u015fa d\u00f6n\u00fcld\u00fc.",
+      sumGenre: "M\u00fczik tarz\u0131", sumTempo: "Tempo", sumMood: "Mood", sumVocal: "Vokal", sumVt: "Vokal tekni\u011fi", sumFx: "Ekstra teknik detay",
+      sumMix: "Mix & Master", sumScen: "M\u00fczikal senaryo", sumMakam: "Makam", sumNota: "Dizi yap\u0131s\u0131",
+      vocalYesShort: "Vokalli Prod\u00fcksiyon", vocalNoShort: "Enstr\u00fcmantal / Vokal Yok", notRequired: "Gerekli de\u011fil", notSelected: "Se\u00e7ilmedi", notGiven: "belirtilmedi",
+      langLabel: "Dil"
+    },
+    en: {
+      tagline: "Pick a music style and build a Suno/Udio prompt step by step.",
+      stepLabels: ["Genre", "Tempo & Mood", "Vocals", "Production", "Prompt"],
+      progress: function (n) { return "Step " + n + " / 5"; },
+      s1title: "Music Categories", genreCap: "Genre", genreEmpty: "Not selected yet",
+      s2title: "Tempo and Atmosphere", tempoTitle: "Tempo (BPM)", tempoCap: "Tempo", tempoEmpty: "Choose tempo",
+      moodTitle: "Mood", moodCap: "Mood", moodEmpty: "Choose mood",
+      s3title: "Vocals and Technical Details", vocalTitle: "Vocal Choice",
+      vocalYesT: "Vocal Production", vocalYesD: "Adds vocal recording and vocal techniques",
+      vocalNoT: "Instrumental / No Vocals", vocalNoD: "Music only, vocal techniques disabled",
+      vocalNone: "No vocal choice made yet.", vocalSelYes: "Selected: Vocal Production.", vocalSelNo: "Selected: Instrumental / No Vocals.",
+      vtTitle: "Vocal Techniques", vtCap: "Vocal technique", vtEmpty: "Choose vocal technique", vtNoteLocked: "Choose a vocal option first.", vtNoteYes: "Choose a vocal technique.", vtNoteNo: "Not needed for instrumental tracks.",
+      fxTitle: "Extra Technical Detail", fxCap: "Technical detail", fxEmpty: "Choose technical detail",
+      s4title: "Production, Scenario and Scale", s4note: "Mix & Master and Musical Scenario are required. Makam and scale are optional.",
+      mixTitle: "Mix & Master", mixCap: "Mix & Master", scenTitle: "Musical Scenario & Atmosphere", scenCap: "Scenario",
+      makamTitle: "Makam (Farabi Modes)", makamCap: "Makam (optional)", notaTitle: "Notation, Solfege & Scale", notaCap: "Scale (optional)",
+      empty: "Not selected", selected: "Selected: ",
+      s5title: "Final Prompt", summaryTitle: "Your Choices",
+      loaderMsgs: ["Prompductor engine is running...", "Calibrating frequencies and Farabi modes...", "Compiling the final prompt..."],
+      genSr: "Preparing prompt...",
+      soundLabel: "Sound Prompt (English, single line)", lyricsLabel: "Lyrics (Turkish lyrics and structure tags)",
+      copySound: "Copy Sound Prompt", copyLyrics: "Copy Lyrics", copyAll: "Copy All",
+      copied: "Copied \u2714", copyFail: "Copy failed. You can select the text and copy it manually.",
+      copiedMsg: "Copied to clipboard.",
+      reset: "\u21ba Reset / Start Over", back: "\u2039 Back", next: "Next \u203a", generate: "Generate Prompt \u203a",
+      needGenre: "Please choose a music style first.", needTempoMood: "Please choose a tempo and a mood.",
+      needVocal: "Complete the vocal choice, vocal technique (if vocals are chosen) and technical detail selections.",
+      needRequired: "Mix & Master and Musical Scenario are required.",
+      genreSel: "Genre selected: ", genreReady: ". Next button is active.",
+      tempoSel: "Tempo selected: ", moodSel: "Mood selected: ", vtSel: "Vocal technique selected: ", fxSel: "Technical detail selected: ",
+      mixSel: "Mix & Master selected: ", scenSel: "Scenario selected: ", makamSel: "Makam selected: ", notaSel: "Scale selected: ",
+      vocalOnSel: "Vocal production selected. Vocal technique menu is open.", vocalOffSel: "Instrumental selected. Vocal techniques are disabled.",
+      promptReady: "Prompt ready. Sound Prompt and Lyrics are in the text areas.",
+      resetDone: "Returned to the start for a new track.",
+      sumGenre: "Music style", sumTempo: "Tempo", sumMood: "Mood", sumVocal: "Vocals", sumVt: "Vocal technique", sumFx: "Extra technical detail",
+      sumMix: "Mix & Master", sumScen: "Musical scenario", sumMakam: "Makam", sumNota: "Scale structure",
+      vocalYesShort: "Vocal Production", vocalNoShort: "Instrumental / No Vocals", notRequired: "Not required", notSelected: "Not selected", notGiven: "not specified",
+      langLabel: "Language"
+    }
+  };
+
+  // ---------- Secenekler: [id, TR baslik, TR aciklama, EN baslik, EN aciklama] ----------
+  var GENRES = [
+    ["hiphop", "Hip Hop & Boom Bap", "Tozlu plak, 80-85 BPM, a\u011f\u0131r sub bass", "Hip Hop & Boom Bap", "Dusty records, heavy sub bass"],
+    ["trip", "Dark Trip Hop", "Melankolik, karanl\u0131k katmanlar, yava\u015f ritim", "Dark Trip Hop", "Melancholic, dark layers, slow groove"],
+    ["noir", "Jazz Noir", "Rhodes, dumanl\u0131 saksafon, gece atmosferi", "Jazz Noir", "Rhodes, smoky saxophone, night atmosphere"],
+    ["sufi", "Sufi-Fusion & Cyber-Sufizm", "Ney, tambur, modern synthler, mistik", "Sufi-Fusion & Cyber-Sufism", "Ney, tanbur, modern synths, mystical"],
+    ["lofi", "Downtempo & Lo-Fi", "Sakin, s\u0131cak analog dokular, rahat ritimler", "Downtempo & Lo-Fi", "Calm, warm analog textures, relaxed rhythm"],
+    ["funk", "Funk & Soul", "Groove, canl\u0131 bas y\u00fcr\u00fcy\u00fc\u015fleri, vintage", "Funk & Soul", "Groove, live bass lines, vintage"],
+    ["trap", "Trap & Bass", "A\u011f\u0131r 808, karanl\u0131k atmosfer", "Trap & Bass", "Heavy 808, dark atmosphere"],
+    ["ambient", "Elektronik & Ambient", "Uzun dokular, sentezleyiciler, derin alan", "Electronic & Ambient", "Long textures, synthesizers, deep space"],
+    ["rock", "Rock & Alternatif", "Gitar odakl\u0131, dinamik, ham enerji", "Rock & Alternative", "Guitar-driven, dynamic, raw energy"],
+    ["classical", "Klasik & Neo-Klasik", "Orkestral dokular, piyano, minimal yap\u0131", "Classical & Neo-Classical", "Orchestral textures, piano, minimal structure"]
+  ];
+  var TEMPOS = [
+    ["t50", "50-60 BPM", "\u00c7ok A\u011f\u0131r, Dron, Meditatif", "50-60 BPM", "Very slow, drone, meditative"],
+    ["t60", "60-70 BPM", "Derin Downtempo, Trip Hop", "60-70 BPM", "Deep downtempo, trip hop"],
+    ["t70", "70-78 BPM", "Karanl\u0131k Yava\u015f Boom Bap, Caz", "70-78 BPM", "Dark slow boom bap, jazz"],
+    ["t80", "80-85 BPM", "Klasik Boom Bap, Tozlu Plak", "80-85 BPM", "Classic boom bap, dusty vinyl"],
+    ["t86", "86-92 BPM", "Mid-tempo Hip Hop & Neo-Soul", "86-92 BPM", "Mid-tempo hip hop & neo-soul"],
+    ["t93", "93-100 BPM", "Golden Era Groove & Funk", "93-100 BPM", "Golden era groove & funk"],
+    ["t100", "100-110 BPM", "A\u011f\u0131r Disco, Afrobeats", "100-110 BPM", "Heavy disco, afrobeats"],
+    ["t110", "110-120 BPM", "Deep House, Nu-Disco, Synthwave", "110-120 BPM", "Deep house, nu-disco, synthwave"],
+    ["t120", "120-128 BPM", "Klasik House, Techno", "120-128 BPM", "Classic house, techno"],
+    ["t128", "128-140 BPM", "Trap, Drill, UK Garage", "128-140 BPM", "Trap, drill, UK garage"],
+    ["t140", "140-155 BPM", "Dubstep, H\u0131zl\u0131 Trap", "140-155 BPM", "Dubstep, fast trap"],
+    ["t155", "155-175 BPM", "Drum and Bass, Jungle", "155-175 BPM", "Drum and bass, jungle"],
+    ["tfree", "Serbest Tempo", "Rubato, Ambient, Metronomsuz", "Free tempo", "Rubato, ambient, non-metronomic"]
+  ];
+  var MOODS = [
+    ["m1", "Melankolik & Gece", "Karanl\u0131k sokaklar, gece ya\u011fmuru", "Melancholic & Night", "Dark streets, night rain"],
+    ["m2", "Dumanl\u0131 Jazz Noir", "Tekinsiz barlar, yaln\u0131zl\u0131k", "Smoky Jazz Noir", "Shady bars, loneliness"],
+    ["m3", "Mistik & Cyber-Sufizm", "Ney, derin tefekk\u00fcr, trans", "Mystical & Cyber-Sufism", "Ney, deep contemplation, trance"],
+    ["m4", "A\u011f\u0131r Sokak & Realizm", "\u00c7\u0131\u011f ger\u00e7eklik, sert beton", "Heavy Street & Realism", "Raw reality, hard concrete"],
+    ["m5", "Sakin & Lo-Fi", "Kahve, analog s\u0131cakl\u0131k", "Calm & Lo-Fi", "Coffee, analog warmth"],
+    ["m6", "Nostaljik & Hat\u0131ralar", "Eski kasetler, sepya tonlar", "Nostalgic & Memories", "Old tapes, sepia tones"],
+    ["m7", "Gergin & Sinematik", "Psikolojik gerilim, bekleyi\u015f", "Tense & Cinematic", "Psychological tension, waiting"],
+    ["m8", "Karanl\u0131k & Gotik", "A\u011f\u0131r baslar, so\u011fuk end\u00fcstriyel his", "Dark & Gothic", "Heavy bass, cold industrial feel"],
+    ["m9", "Co\u015fkulu & Zafer", "Ritmik g\u00fc\u00e7, y\u00fckseli\u015f", "Euphoric & Triumphant", "Rhythmic power, rising"],
+    ["m10", "Agresif & \u0130syan", "Distorsiyonlu baslar, \u00e7\u0131\u011f \u00f6fke", "Aggressive & Rebellious", "Distorted bass, raw anger"],
+    ["m11", "R\u00fcya Gibi & Ethereal", "U\u00e7u\u015fan synthler, ger\u00e7e\u00fcst\u00fc", "Dreamy & Ethereal", "Floating synths, surreal"],
+    ["m12", "H\u00fcz\u00fcnl\u00fc & Veda", "Son bak\u0131\u015f, ayr\u0131l\u0131k ac\u0131s\u0131", "Sorrowful & Farewell", "Last look, parting ache"]
+  ];
+  var VOCAL_TECHS = [
+    ["vt1", "Vocoder & Robotik", "Derin vocoder mod\u00fclasyonu", "Vocoder & Robotic", "Deep vocoder modulation"],
+    ["vt2", "Stutter & Glitch FX", "Kesik, ritmik glitch vokal", "Stutter & Glitch FX", "Chopped, rhythmic glitch vocals"],
+    ["vt3", "Breathy & Whispering", "Nefesli, yak\u0131n mikrofon", "Breathy & Whispering", "Breathy, close-mic whisper"],
+    ["vt4", "Vocal Fry & Husky", "H\u0131rt\u0131ll\u0131, bo\u011fuk sokak vokali", "Vocal Fry & Husky", "Gravelly, husky street vocal"],
+    ["vt5", "Telephone & Radio", "Bandpass lo-fi radyo sesi", "Telephone & Radio", "Bandpass lo-fi radio tone"],
+    ["vt6", "Pitch-Shifted & Chopped", "Yava\u015flat\u0131lm\u0131\u015f derin vokal", "Pitch-Shifted & Chopped", "Slowed, deep pitched vocal"],
+    ["vt7", "Reverse Reverb", "Ters reverb, say\u0131klayan yank\u0131lar", "Reverse Reverb", "Reverse reverb, ethereal tails"],
+    ["vt8", "Soulful Humming & Chant", "Mistik m\u0131r\u0131lt\u0131 ve zikir", "Soulful Humming & Chant", "Mystical hum and chant hooks"],
+    ["vt9", "Auto-Tune & Melodic", "Hafif veya agresif autotune", "Auto-Tune & Melodic", "Subtle or aggressive auto-tune"],
+    ["vt10", "Ham & Akustik", "S\u0131f\u0131r efekt, do\u011fal kay\u0131t", "Raw & Acoustic", "Zero effects, natural recording"]
+  ];
+  var FX = [
+    ["f1", "Turntable Scratch", "Plak kesme ve scratch", "Turntable Scratch", "Record cutting and scratches"],
+    ["f2", "Sinematik Intro", "Sub boom, kalp at\u0131\u015f\u0131 y\u00fckseli\u015fi", "Cinematic Intro", "Sub boom, heartbeat build"],
+    ["f3", "Vinyl Crackle & Tape Hiss", "Ta\u015f plak c\u0131z\u0131lt\u0131s\u0131, kaset h\u0131\u015f\u0131lt\u0131s\u0131", "Vinyl Crackle & Tape Hiss", "Vinyl crackle, tape hiss"],
+    ["f4", "Beat Drop & Silence", "Ani suskunluk, a\u011f\u0131r bas patlamas\u0131", "Beat Drop & Silence", "Sudden silence, heavy bass impact"],
+    ["f5", "Reverse Cymbals & Riser", "Ters ziller, s\u00fcp\u00fcrme efektleri", "Reverse Cymbals & Riser", "Reverse cymbals, riser sweeps"],
+    ["f6", "Rhodes & Tape Delay", "Analog Rhodes, s\u0131cak eko", "Rhodes & Tape Delay", "Analog Rhodes, warm tape echo"],
+    ["f7", "808 Glide & Sub Drop", "Yeri sarsan 808 kayma\u0131", "808 Glide & Sub Drop", "Floor-shaking 808 slide"],
+    ["f8", "Sample Chopping", "Eski soul sample kesme", "Sample Chopping", "Chopping old soul samples"],
+    ["f9", "Field Recording", "Ya\u011fmur, sokak sesi, b\u00f6cekler", "Field Recording", "Rain, street sound, insects"],
+    ["f10", "Outro Vinyl Stop", "Plak motoru durma efekti", "Outro Vinyl Stop", "Turntable slowing to a stop"]
+  ];
+  var MIX = [
+    ["mx1", "Analog Tape Warmth", "S\u0131cak kaset doygunlu\u011fu, t\u00fcp kompres\u00f6r", "Analog Tape Warmth", "Warm tape saturation, tube compression"],
+    ["mx2", "Dynamic & Punchy", "Geni\u015f dinamik aral\u0131k, a\u00e7\u0131k master", "Dynamic & Punchy", "Wide dynamic range, open master"],
+    ["mx3", "Loud Club Master", "-6 ile -8 LUFS, agresif limit", "Loud Club Master", "-6 to -8 LUFS, aggressive limiting"],
+    ["mx4", "Dark Lo-Fi", "SP-1200 karakteri, tozlu alt frekans", "Dark Lo-Fi", "SP-1200 character, dusty low end"],
+    ["mx5", "Binaural 3D", "Dolby Atmos hissi, geni\u015f sahne", "Binaural 3D", "Dolby Atmos feel, wide stage"],
+    ["mx6", "Mono Bass & Wide Stereo", "Mono sub, geni\u015f stereo synthler", "Mono Bass & Wide Stereo", "Mono sub, wide stereo synths"],
+    ["mx7", "Radio-Ready Clarity", "Kristal \u00fcst frekans, p\u00fcr\u00fczs\u00fcz vokal", "Radio-Ready Clarity", "Crisp highs, smooth vocals"],
+    ["mx8", "Heavy Sidechain", "Kick ile agresif ducking", "Heavy Sidechain", "Aggressive kick-triggered ducking"]
+  ];
+  var SCEN = [
+    ["sc1", "Galata Geceyar\u0131s\u0131", "Ya\u011fmurlu sokak, neon yans\u0131mas\u0131", "Galata Midnight", "Rainy street, neon reflections"],
+    ["sc2", "Yeralt\u0131 Hesapla\u015fmas\u0131", "Sessizlikte patlayan gerilim", "Underground Reckoning", "Tension bursting from silence"],
+    ["sc3", "Mistik Tefekk\u00fcr", "Sufi derinli\u011fi, ney ve \u00e7\u00f6l", "Mystical Contemplation", "Sufi depth, ney and desert"],
+    ["sc4", "Cyberpunk Ka\u00e7\u0131\u015f", "2089 metropol\u00fc, ar\u0131za sinyaller", "Cyberpunk Escape", "2089 metropolis, glitch signals"],
+    ["sc5", "Eski Foto\u011fraf", "Tozlu alb\u00fcm, kay\u0131p hat\u0131ralar", "Old Photograph", "Dusty album, lost memories"],
+    ["sc6", "Zafer Yolu", "Sokaktan zirveye y\u00fckseli\u015f", "Road to Victory", "Rising from the street to the top"],
+    ["sc7", "Gece Vardiyas\u0131", "Sabah\u0131n d\u00f6rd\u00fc, yaln\u0131z zihin", "Night Shift", "4 a.m., a lonely mind"],
+    ["sc8", "Sinematik Veda", "Jenerik, tamamlanmam\u0131\u015f hesap", "Cinematic Farewell", "End credits, unfinished reckoning"]
+  ];
+  var MAKAM = [
+    ["mk1", "Rast Makam\u0131", "Ne\u015fe, huzur; seher vakti", "Rast Makam", "Joy and calm; dawn"],
+    ["mk2", "U\u015f_ak Makam\u0131", "Sevin\u00e7, cesaret; \u00f6\u011fle vakti", "Ushshaq Makam", "Joy and courage; noon"],
+    ["mk3", "Hicaz Makam\u0131", "Derin h\u00fcz\u00fcn, i\u00e7e d\u00f6n\u00fc\u015f; yats\u0131", "Hijaz Makam", "Deep yearning, introspection; night prayer"],
+    ["mk4", "Neva Makam\u0131", "Cesaret, ferahl\u0131k; ak\u015fam", "Neva Makam", "Courage, openness; evening"],
+    ["mk5", "H\u00fcseyni Makam\u0131", "Bar\u0131\u015f, dinginlik; sabah", "Huseyni Makam", "Peace, stillness; morning"],
+    ["mk6", "Isfahan Makam\u0131", "Zihni a\u00e7ar, hat\u0131ralar; ikindi", "Isfahan Makam", "Clarity and memory; afternoon"],
+    ["mk7", "Zirefkend Makam\u0131", "Melankoli, derin d\u00fc\u015f\u00fcnce; gece yar\u0131s\u0131", "Zirefkend Makam", "Melancholy, deep thought; midnight"],
+    ["mk8", "B\u00fcz\u00fcrk Makam\u0131", "Heybet, g\u00fc\u00e7; fecre do\u011fru", "Buzurk Makam", "Dignity, strength; before dawn"],
+    ["mk9", "Nihavend Makam\u0131", "Melankolik zarafet", "Nihavend Makam", "Melancholic grace"],
+    ["mk10", "Segah Makam\u0131", "Mistik hu\u015fu, manevi y\u00fckseli\u015f", "Segah Makam", "Mystical awe, spiritual ascent"]
+  ];
+  var NOTA = [
+    ["n1", "Pentatonik Dizi", "Blues & Soul temeli, 5 ses", "Pentatonic Scale", "Blues and soul foundation, 5 notes"],
+    ["n2", "Do\u011fal Min\u00f6r", "A\u011f\u0131r h\u00fcz\u00fcn, sinematik", "Natural Minor", "Heavy sorrow, cinematic"],
+    ["n3", "Armonik Min\u00f6r", "Oryantal caz, neo-klasik gerilim", "Harmonic Minor", "Oriental jazz, neo-classical tension"],
+    ["n4", "Doriyan Modu", "Jazz Noir ve funk akorlar\u0131", "Dorian Mode", "Jazz noir and funk chords"],
+    ["n5", "Frigyan Modu", "Flamenko ve oryantal trap", "Phrygian Mode", "Flamenco and oriental trap"],
+    ["n6", "Maj\u00f6r Gam", "Ayd\u0131nl\u0131k, epik", "Major Scale", "Bright, epic"],
+    ["n7", "Blues Gam\u0131", "Mavi notalar, \u00e7\u0131\u011f duygu", "Blues Scale", "Blue notes, raw emotion"],
+    ["n8", "Koma & Mikrotonal", "T\u00fcrk m\u00fczi\u011fi \u00e7eyrek tonlar\u0131", "Comma & Microtonal", "Turkish quarter tones (koma)"]
+  ];
+
+  // ---------- Prompt sozlukleri (Sound Prompt her zaman Ingilizce) ----------
+  var EN = {
+    genre: { hiphop: "boom bap hip hop, dusty drum breaks, heavy sub bass", trip: "dark trip hop, downtempo, melancholic layered textures", noir: "jazz noir, Rhodes piano, smoky saxophone", sufi: "sufi-fusion, cyber-sufism, ney and tanbur blended with modern synths", lofi: "downtempo lo-fi, warm analog textures, relaxed groove", funk: "funk and soul, live bass grooves, vintage feel", trap: "trap and bass, heavy 808s, dark atmosphere", ambient: "electronic ambient, long evolving pads, deep spatial sound", rock: "alternative rock, guitar-driven, raw dynamic energy", classical: "neo-classical, orchestral textures, piano, minimal structure" },
+    mood: { m1: "melancholic night mood, rain on dark streets", m2: "smoky jazz noir, loneliness, late-night bars", m3: "mystical cyber-sufism, deep contemplation, trance state", m4: "heavy street realism, raw concrete, gritty struggle", m5: "calm lo-fi serenity, analog warmth, quiet morning", m6: "nostalgic, faded cassette memories, sepia tones", m7: "tense cinematic suspense, uneasy anticipation", m8: "dark gothic atmosphere, cold industrial heaviness", m9: "euphoric triumphant energy, rising rhythmic power", m10: "aggressive defiant rebellion, distorted bass", m11: "dreamlike ethereal haze, floating synths", m12: "bittersweet farewell, final glance, quiet acceptance" },
+    vt: { vt1: "deep vocoder vocals, robotic modulation", vt2: "stutter and glitch vocal FX, rhythmic chopped phrases", vt3: "breathy whispered vocals, close mic, jazz intimacy", vt4: "vocal fry and husky delivery, gritty street tone", vt5: "telephone and radio bandpass vocal filter", vt6: "pitch-shifted and chopped vocals, slowed deep voice", vt7: "reverse reverb vocal tails, ethereal echoes", vt8: "soulful humming and chant hooks, mystical choral layers", vt9: "subtle to aggressive auto-tune, melodic distortion", vt10: "raw dry studio vocal, zero effects" },
+    fx: { f1: "turntable scratching and baby scratches", f2: "cinematic trailer intro, deep sub boom, heartbeat build", f3: "dusty vinyl crackle and tape hiss", f4: "beat drop with sudden silence", f5: "reverse cymbals, riser FX and transition impacts", f6: "analog Rhodes with warm tape delay and flanger", f7: "heavy 808 glide and sub bass drop", f8: "sample chopping and repitching of old soul records", f9: "ambient field recordings: rain, street noise, night insects", f10: "outro vinyl stop and tape stop" },
+    mix: { mx1: "analog tape warmth, tube compression, console saturation", mx2: "high dynamic range, uncompressed punch, open mastering", mx3: "loud brickwall limiting around -6 to -8 LUFS, aggressive club master", mx4: "dark lo-fi, SP-1200 12-bit character, dusty low end", mx5: "binaural 3D spatial audio, Dolby Atmos ready, wide panoramic depth", mx6: "mono-stable sub and 808, wide stereo synths and strings", mx7: "radio-ready clarity, crisp highs, de-essed smooth vocals", mx8: "heavy sidechain pumping, kick-triggered ducking" },
+    scen: { sc1: "Galata midnight in the rain, neon reflections, melancholic walk", sc2: "underground confrontation, tension bursting out of silence, noir cinema", sc3: "mystical introspection, ney and desert wind, timeless search", sc4: "cyberpunk chaos, 2089 metropolis, glitching signals, synthetic chase", sc5: "old photograph and lost memories, dusty album, nostalgic sigh", sc6: "rise from the streets to the top, proud and defiant ascent", sc7: "night shift at 4 a.m., cigarette smoke, sleepless mind", sc8: "cinematic farewell, final song over closing credits, unfinished reckoning" },
+    makam: { mk1: "Rast makam (Western modal analogue: major-leaning, bright)", mk2: "Ushshaq makam (analogue: Dorian-leaning, cheerful courage)", mk3: "Hijaz makam (analogue: Phrygian dominant, deep sorrow)", mk4: "Neva makam (analogue: natural minor, open courage)", mk5: "Huseyni makam (analogue: Dorian/Aeolian, calm peace)", mk6: "Isfahan makam (analogue: Mixolydian-leaning, clarity)", mk7: "Zirefkend makam (analogue: Aeolian, reflective melancholy)", mk8: "Buzurk makam (analogue: Ionian, grand dignity)", mk9: "Nihavend makam (analogue: harmonic minor, melancholic grace)", mk10: "Segah makam (analogue: Lydian-leaning, mystical ascent)" },
+    nota: { n1: "pentatonic scale", n2: "natural minor, aeolian", n3: "harmonic minor, oriental tension", n4: "dorian mode, jazz funk chords", n5: "phrygian mode, flamenco trap texture", n6: "major scale, epic", n7: "blues scale, bent notes", n8: "microtonal quarter tones, koma" }
+  };
+  var VOCAL_TAG = {
+    vt1: "[Vocoder Vocal, Robotic]", vt2: "[Glitch Vocal, Stuttered]", vt3: "[Breathy Jazz Vocal, Whispered]", vt4: "[Male Vocal, Gritty]",
+    vt5: "[Lo-Fi Vocal, Radio Filter]", vt6: "[Pitched Vocal, Slowed]", vt7: "[Ethereal Vocal, Reverb Tails]", vt8: "[Soulful Chant Vocal]",
+    vt9: "[Melodic Vocal, Auto-Tune]", vt10: "[Raw Vocal, Dry]"
+  };
+  var LYR = {
+    sc1: { v1: ["Galata'da ya\u011fmur iner, neon \u0131slan\u0131r asfaltta", "Ad\u0131mlar\u0131m sessiz, \u015fehir bir kalp gibi atar", "Kimse bilmez bu soka\u011f\u0131n hangi s\u0131r\u0131n\u0131 ta\u015f\u0131d\u0131\u011f\u0131m\u0131", "Gece uzar, ben h\u00e2l\u00e2 burada (burada)"], pre: ["I\u015f\u0131klar titrer, bir pencere kapan\u0131r", "Bir isim d\u00fc\u015fer dudaklar\u0131mdan"], ch: ["Gecenin i\u00e7inde kaybolduk (kaybolduk)", "Ya\u011fmur y\u0131kar izimizi, sen gitme (gitme)", "Galata sustu, ben konu\u015fuyorum", "Bir kez daha y\u00fcr\u00fc benimle (benimle)"], v2: ["Vitrinde solmu\u015f bir g\u00fcl\u00fcmseme", "Yank\u0131lan\u0131r ta\u015f merdivenlerde ad\u0131m ad\u0131m", "Son tramvay da gitti, ben kald\u0131m (kald\u0131m)"], br: ["Sessizlik... sadece ya\u011fmur", "Sadece ben ve bu sokak (bu sokak)"], out: "Ya\u011fmur durdu, \u0131\u015f\u0131k s\u00f6nd\u00fc, ben y\u00fcr\u00fcd\u00fcm" },
+    sc2: { v1: ["Sessizlik \u00e7atlar, g\u00f6lgeler konu\u015fur", "Yeralt\u0131nda hesap verilir, a\u011f\u0131r a\u011f\u0131r", "Kimin elinde kald\u0131 o eski s\u00f6zler", "Her ad\u0131mda bir kap\u0131 kapan\u0131r (kapan\u0131r)"], pre: ["Nefesler kesilir, kalp h\u0131zlan\u0131r", "Bir k\u0131v\u0131lc\u0131m, bir \u00e7\u0131\u011fl\u0131k bekler"], ch: ["Bu gece hesapla\u015fma var (hesapla\u015fma var)", "Susma art\u0131k, konu\u015f ya da kaybol", "Karanl\u0131\u011f\u0131n alt\u0131nda yan\u0131yor kor", "Sen de biliyorsun, bu son perde (son perde)"], v2: ["Duvarlara yaz\u0131lm\u0131\u015f eski bir isim", "Ses kesilir, ard\u0131ndan gelir f\u0131rt\u0131na", "Ben s\u00f6yledim, sen dinlemedin (dinlemedin)"], br: ["Bir saniye... sonra patlama", "Karanl\u0131k bile geri \u00e7ekilir (geri \u00e7ekilir)"], out: "Hesap kapand\u0131, ama i\u00e7imde h\u00e2l\u00e2 bir ses var" },
+    sc3: { v1: ["Ney a\u011flar, \u00e7\u00f6l r\u00fczg\u00e2r\u0131 f\u0131s\u0131ldar", "Zaman\u0131n \u00f6tesinde bir aray\u0131\u015f var", "Topra\u011fa de\u011fen bir nefes gibiyim", "Kendimi aray\u0131r\u0131m, sonsuzluk i\u00e7inde (i\u00e7inde)"], pre: ["D\u00f6nmeye ba\u015flar g\u00f6\u011fyz", "Bir ses \u00e7a\u011f\u0131r\u0131r, Hakk'a do\u011fru"], ch: ["D\u00f6ner dervi\u015fim, i\u00e7imde bir yol (yol)", "Her turda biraz daha hafifliyorum", "Ney'in sesi i\u00e7imde yank\u0131lan\u0131r (yank\u0131lan\u0131r)", "Ben var1m, ben yokum, ben buraday1m"], v2: ["Kum tanesi gibi k\u00fc\u00e7\u00fcl\u00fcyor d\u00fcnya", "G\u00f6zlerimi kapat\u0131nca g\u00f6r\u00fcyorum \u0131\u015f\u0131\u011f\u0131 (\u0131\u015f\u0131\u011f\u0131)", "Sab\u0131r ta\u015f\u0131 \u00e7at\u0131ld\u0131, sen de gel"], br: ["Sessizlik, sadece nefes", "Hu... (hu) ... Hu (hu)"], out: "Ney sustu, ama yol h\u00e2l\u00e2 a\u00e7\u0131k" },
+    sc4: { v1: ["2089'un \u015fehri sinyalleri kesiyor", "Sentetik g\u00f6lgeler pe\u015fimde ko\u015fuyor", "Neon kablolar bo\u011faz\u0131m sar\u0131yor", "Kodlar \u00e7\u00f6z\u00fcl\u00fcr, ben ka\u00e7ar\u0131m (ka\u00e7ar\u0131m)"], pre: ["Ekranlar titrer, alarm \u00e7alar", "Bir tu\u015fa bas\u0131l\u0131r, d\u00fcnya kayar"], ch: ["Ka\u00e7\u0131yorum, kodlar \u00e7\u00f6z\u00fcl\u00fcyor (\u00e7\u00f6z\u00fcl\u00fcyor)", "G\u00f6kyz par\u00e7alanm\u0131\u015f bir haf\u0131za", "Sistem beni tan\u0131m\u0131yor art\u0131k", "Sadece bir ses kald\u0131, dur (dur)"], v2: ["Ar\u0131za sinyaller beynimde yank\u0131lan\u0131r", "Makine a\u011flar, insan g\u00fcl\u0131mse\u0131r art\u0131k (g\u00fclmez)", "Son bir kez ba\u011flan, sonra kopar"], br: ["Glitch... glitch... sessizlik", "Tek bir nefes, tek bir karar (karar)"], out: "Ba\u011flant\u0131 koptu, ama ben h\u00e2l\u00e2 buday\u0131m" },
+    sc5: { v1: ["Tozlu alb\u00fcmde bir y\u00fcz g\u00fcl\u00fcms\u00fcyor", "Kay\u0131p hat\u0131ralar sigara duman\u0131 gibi", "Sar\u0131lm\u0131\u015f k\u00e2\u011f\u0131tta bir tarih, bir isim", "Zaman durur, sen h\u00e2l\u00e2 burada (burada)"], pre: ["Bir foto\u011fraf, bir i\u00e7 \u00e7eki\u015f", "\u00c7alar saatin t\u0131k\u0131rt\u0131s\u0131 gibi"], ch: ["Eski foto\u011fraf, sen h\u00e2l\u00e2 burada (burada)", "Kay\u0131p sesler bir kasette d\u00f6n\u00fcyor", "Ne kadar uzakla\u015fsam da sana d\u00f6n\u00fcyorum", "Hat\u0131ralar solu\u015f, ama ben h\u00e2l\u00e2 seninim (seninim)"], v2: ["\u00c7ekmecede bir mektup, yar\u0131m kalm\u0131\u015f", "M\u00fcrekkep ak\u0131m\u0131\u015f, kalp dolmu\u015f ta\u015fm\u0131\u015f", "Bir \u015fark\u0131 \u00e7al\u0131r, yine seni anar\u0131m (anar\u0131m)"], br: ["Tozlar u\u00e7u\u015fur \u0131\u015f\u0131k huzmesinde", "Hi\u00e7bir \u015fey eskisi gibi de\u011fil (de\u011fil)"], out: "Alb\u00fcm kapand\u0131, ama sen h\u00e2l\u00e2 i\u00e7imdesin" },
+    sc6: { v1: ["Sokaklardan ba\u015flayan bir yolculuk", "Ba\u015f\u0131m dik, bedelini \u00f6dedim", "Her d\u00fc\u015fl\u00fcrde bir kez daha kald\u0131m", "Bu \u015fehir bana hi\u00e7 kolay vermedi (vermedi)"], pre: ["Ses y\u00fckselir, ad\u0131m h\u0131zlan\u0131r", "Yar\u0131 yolda durmak yok art\u0131k"], ch: ["Zirveye \u00e7\u0131k\u0131yorum, bu sefer d\u00f6nmem (d\u00f6nmem)", "Her yara bir ni\u015fan, her iz bir hik\u00e2ye", "Sokaktan geldim, tepeye y\u00fcr\u00fcyorum", "Kimse bilmez bu g\u00fcc\u00fc, ben biliyorum (biliyorum)"], v2: ["Ta\u015f duvarlar tan\u0131kt\u0131r bu hik\u00e2yeye", "G\u00f6z\u00fcmde kor, sesimde kararl\u0131l\u0131k", "D\u00fc\u015fenler var, ben h\u00e2l\u00e2 aya\u011f\u0131y\u0131m (aya\u011f\u0131y\u0131m)"], br: ["Bir nefes, bir yemin", "Zafer, sessizce gelir (gelir)"], out: "Zirvedeyim, ama a\u015fa\u011f\u0131ya h\u00e2l\u00e2 bak\u0131yorum" },
+    sc7: { v1: ["Sabah\u0131n d\u00f6rd\u00fc, \u015fehir uyanmadan", "Sigara duman\u0131nda d\u00fc\u015f\u00fcnen bir zihin", "Bard\u0131\u011f\u0131n dibinde kalan son yudum", "Saat t\u0131klad\u0131k\u00e7a i\u00e7im a\u011f\u0131rla\u015f\u0131r (a\u011f\u0131rla\u015f\u0131r)"], pre: ["Pencerede ilk \u0131\u015f\u0131k belirmeden", "Bir karar, bir sessizlik"], ch: ["Gece vardiyas\u0131, yaln\u0131z ama dimdik (dimdik)", "Herkes uyur, ben hesap yapar\u0131m", "D\u00fc\u015f\u00fcncelerim bir koridorda yank\u0131lan\u0131r", "Sabah gelir, ama ben h\u00e2l\u00e2 buday\u0131m (buday\u0131m)"], v2: ["Telefon susar, ekran parlar", "Bir mesaj yaz\u0131l\u0131r, silinir, yaz\u0131l\u0131r (yaz\u0131l\u0131r)", "Kahve so\u011fur, zihin \u0131s\u0131n\u0131r"], br: ["Sessizlik ve tek bir d\u00fc\u015f\u00fcnce", "Kendimle hesapla\u015fmak zor (zor)"], out: "G\u00fcne\u015f do\u011fdu, ben h\u00e2l\u00e2 d\u00fc\u015f\u00fcn\u00fcyorum" },
+    sc8: { v1: ["Jenerik ak\u0131rken son nota \u00e7alar", "Tamamlanmam\u0131\u015f bir hesap kald\u0131", "Perde iner, \u0131\u015f\u0131k yava\u015f\u00e7a s\u00f6ner", "Son bak\u0131\u015f, bir kez daha bakar\u0131m (bakar\u0131m)"], pre: ["Ayr\u0131l\u0131k sessizce yakla\u015f\u0131r", "Bir el sallan\u0131r, kap\u0131 aral\u0131n\u0131r"], ch: ["Veda ediyorum, ama bitmedi bu hik\u00e2ye (bitmedi)", "Son kare donar, ses k\u0131s\u0131l\u0131r", "Bir hesap kald\u0131 geriye (hesap kald\u0131)", "Ve sen gidince bile kal\u0131rs\u0131n (kal\u0131rs\u0131n)"], v2: ["Koltuklar bo\u015fal1r, salon sessizle\u015fir", "Perdeden s\u00fcz\u00fclen son bir \u0131\u015f\u0131k", "Kap\u0131 kapan\u0131r, ama kalp a\u00e7\u0131k kal\u0131r (a\u00e7\u0131k kal\u0131r)"], br: ["Son nefes, son vuru\u015f", "Her \u015fey biter, ama bir \u015fey kal\u0131r (kal\u0131r)"], out: "Jenerik bitti, hik\u00e2ye h\u00e2l\u00e2 devam ediyor" }
+  };
+
+  // ---------- Durum ----------
+  var lang = "tr";
+  var TOTAL = 5;
+  var currentStep = 1;
+  var state = { genre: null, tempo: null, mood: null, vocal: null, vt: null, fx: null, mix: null, scen: null, makam: null, nota: null };
+  var $ = function (id) { return document.getElementById(id); };
+  var T = function () { return UI[lang]; };
+  var statusEl = $("status");
+
+  function announce(msg) { statusEl.textContent = msg; }
+  function focusEl(el) { if (el) { try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } } }
+  function titleOf(opt) { return lang === "tr" ? opt[1] : opt[3]; }
+  function descOf(opt) { return lang === "tr" ? opt[2] : opt[4]; }
+  function bpmOf(opt) {
+    if (opt[0] === "tfree") return null;
+    var m = opt[1].match(/(\d+)\s*-\s*(\d+)/);
+    return m ? Math.round((parseInt(m[1], 10) + parseInt(m[2], 10)) / 2) : null;
+  }
+
+  var DD = [
+    { p: "genre", list: GENRES, key: "genre", placeholderKey: "genreEmpty" },
+    { p: "tempo", list: TEMPOS, key: "tempo", placeholderKey: "tempoEmpty" },
+    { p: "mood", list: MOODS, key: "mood", placeholderKey: "moodEmpty" },
+    { p: "vt", list: VOCAL_TECHS, key: "vt", placeholderKey: "vtEmpty" },
+    { p: "fx", list: FX, key: "fx", placeholderKey: "fxEmpty" },
+    { p: "mix", list: MIX, key: "mix", placeholderKey: "empty" },
+    { p: "scen", list: SCEN, key: "scen", placeholderKey: "empty" },
+    { p: "makam", list: MAKAM, key: "makam", placeholderKey: "empty" },
+    { p: "nota", list: NOTA, key: "nota", placeholderKey: "empty" }
+  ];
+  var SEL_ANNOUNCE = { genre: "genreSel", tempo: "tempoSel", mood: "moodSel", vt: "vtSel", fx: "fxSel", mix: "mixSel", scen: "scenSel", makam: "makamSel", nota: "notaSel" };
+
+  function setOpen(p, open, withSound) {
+    var toggle = $(p + "-toggle"), panel = $(p + "-panel");
+    if (toggle.disabled) open = false;
+    var was = panel.classList.contains("open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    panel.classList.toggle("open", open);
+    panel.inert = !open;
+    if (withSound && was !== open) play("menu");
+  }
+
+  function renderDropdown(d) {
+    var list = $(d.p + "-list");
+    list.innerHTML = "";
+    d.list.forEach(function (opt) {
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      b.setAttribute("role", "radio");
+      b.setAttribute("data-id", opt[0]);
+      b.setAttribute("aria-checked", state[d.key] && state[d.key].id === opt[0] ? "true" : "false");
+      var text = document.createElement("span"); text.className = "opt-text";
+      var t = document.createElement("span"); t.className = "opt-title"; t.textContent = titleOf(opt);
+      var s = document.createElement("span"); s.className = "opt-desc"; s.textContent = descOf(opt);
+      text.appendChild(t); text.appendChild(s);
+      var check = document.createElement("span"); check.className = "opt-check"; check.setAttribute("aria-hidden", "true"); check.innerHTML = CHECK;
+      b.appendChild(text); b.appendChild(check);
+      b.addEventListener("click", function () { pick(d, opt); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    var value = $(d.p + "-value"), toggle = $(d.p + "-toggle");
+    value.innerHTML = "";
+    if (state[d.key]) {
+      value.insertAdjacentHTML("beforeend", CHECK);
+      value.appendChild(document.createTextNode(T().selected + titleOf(state[d.key].opt)));
+      toggle.classList.add("is-selected");
+    } else {
+      value.textContent = T()[d.placeholderKey];
+      toggle.classList.remove("is-selected");
+    }
+  }
+
+  function pick(d, opt) {
+    state[d.key] = { id: opt[0], opt: opt };
+    if (d.p === "genre") { $("next-1").hidden = false; }
+    if (d.p === "tempo" || d.p === "mood") updateNext2();
+    if (d.p === "vt" || d.p === "fx") updateNext3();
+    if (d.p === "mix" || d.p === "scen") updateNext4();
+    renderDropdown(d);
+    setOpen(d.p, false, false);
+    refreshSelectedLines();
+    play("select");
+    announce(T()[SEL_ANNOUNCE[d.key]] + titleOf(opt) + (d.p === "genre" ? T().genreReady : "."));
+    focusEl($(d.p + "-toggle"));
+  }
+
+  DD.forEach(function (d) {
+    $(d.p + "-toggle").addEventListener("click", function () {
+      setOpen(d.p, !$(d.p + "-panel").classList.contains("open"), true);
+    });
+    $(d.p + "-toggle").addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { setOpen(d.p, false, true); focusEl($(d.p + "-toggle")); }
+    });
+  });
+
+  function refreshSelectedLines() {
+    var vs = $("vocal-sel");
+    if (state.vocal === "yes") { vs.textContent = T().vocalSelYes; vs.classList.add("is-set"); }
+    else if (state.vocal === "no") { vs.textContent = T().vocalSelNo; vs.classList.add("is-set"); }
+    else { vs.textContent = T().vocalNone; vs.classList.remove("is-set"); }
+  }
+
+  function setVocal(value) {
+    state.vocal = value;
+    $("vocal-yes").setAttribute("aria-checked", value === "yes" ? "true" : "false");
+    $("vocal-no").setAttribute("aria-checked", value === "no" ? "true" : "false");
+    if (value === "yes") {
+      $("vt-toggle").disabled = false;
+      $("vt-note").textContent = T().vtNoteYes;
+      announce(T().vocalOnSel);
+    } else {
+      state.vt = null;
+      $("vt-toggle").disabled = true;
+      setOpen("vt", false, false);
+      $("vt-note").textContent = T().vtNoteNo;
+      announce(T().vocalOffSel);
+    }
+    play("select");
+    renderDropdown(DD[3]);
+    refreshSelectedLines();
+    updateNext3();
+  }
+  $("vocal-yes").addEventListener("click", function () { setVocal("yes"); });
+  $("vocal-no").addEventListener("click", function () { setVocal("no"); });
+
+  function updateNext2() { $("next-2").disabled = !(state.tempo && state.mood); }
+  function updateNext3() {
+    var vocalOk = state.vocal === "no" || (state.vocal === "yes" && state.vt);
+    $("next-3").disabled = !(state.vocal && state.fx && vocalOk);
+  }
+  function updateNext4() { $("next-4").disabled = !(state.mix && state.scen); }
+
+  // ---------- Dil ----------
+  function applyLanguage() {
+    var t = T();
+    document.documentElement.lang = lang;
+    $("lang-tr").setAttribute("aria-pressed", lang === "tr" ? "true" : "false");
+    $("lang-en").setAttribute("aria-pressed", lang === "en" ? "true" : "false");
+    $("tagline").textContent = t.tagline;
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      var k = el.getAttribute("data-i18n");
+      if (typeof t[k] === "string") el.textContent = t[k];
+    });
+    $("vocal-yes-t").textContent = t.vocalYesT; $("vocal-yes-d").textContent = t.vocalYesD;
+    $("vocal-no-t").textContent = t.vocalNoT; $("vocal-no-d").textContent = t.vocalNoD;
+    $("vt-note").textContent = state.vocal === "yes" ? t.vtNoteYes : (state.vocal === "no" ? t.vtNoteNo : t.vtNoteLocked);
+    $("s4-note").textContent = t.s4note;
+    $("back-2").textContent = t.back; $("back-3").textContent = t.back; $("back-4").textContent = t.back; $("back-5").textContent = t.back;
+    $("next-1").textContent = t.next; $("next-2").textContent = t.next; $("next-3").textContent = t.next;
+    $("next-4").textContent = t.generate;
+    $("reset-btn").textContent = t.reset;
+    $("copy-sound").textContent = t.copySound; $("copy-lyrics").textContent = t.copyLyrics; $("copy-all").textContent = t.copyAll;
+    $("gen-sr").textContent = t.genSr;
+    $("s2-summary").textContent = state.genre ? (t.genreCap + ": " + titleOf(state.genre.opt)) : "";
+    DD.forEach(renderDropdown);
+    refreshSelectedLines();
+    renderStepper();
+    renderProgress();
+    if ($("gen-result").classList.contains("active")) buildOutputs();
+    if (currentStep === 5) fillSummary();
+  }
+
+  function renderStepper() {
+    var ol = $("stepper");
+    ol.innerHTML = "";
+    T().stepLabels.forEach(function (label, i) {
+      var li = document.createElement("li");
+      var n = i + 1;
+      li.className = n < currentStep ? "done" : (n === currentStep ? "current" : "");
+      li.innerHTML = '<span class="n">' + n + "</span>" + label;
+      ol.appendChild(li);
+    });
+  }
+  function renderProgress() { $("progress").textContent = T().progress(currentStep); }
+
+  function setLang(next) {
+    if (next === lang) return;
+    lang = next;
+    applyLanguage();
+    play("step");
+    announce(T().langLabel + ": " + (lang === "tr" ? "T\u00fcrk\u00e7e" : "English"));
+  }
+  $("lang-tr").addEventListener("click", function () { setLang("tr"); });
+  $("lang-en").addEventListener("click", function () { setLang("en"); });
+
+  // ---------- Adim gecisleri ----------
+  function showStep(n, withSound) {
+    currentStep = n;
+    for (var i = 1; i <= TOTAL; i++) { $("s" + i).classList.toggle("active", i === n); }
+    renderStepper();
+    renderProgress();
+    if (n === 2) $("s2-summary").textContent = state.genre ? (T().genreCap + ": " + titleOf(state.genre.opt)) : "";
+    if (withSound) play("step");
+    focusEl($("s" + n + "-title"));
+  }
+
+  // ---------- Prompt uretimi ----------
+  function buildSoundPrompt() {
+    var parts = [];
+    parts.push(EN.genre[state.genre.id]);
+    parts.push(EN.mood[state.mood.id]);
+    if (state.vocal === "yes") { parts.push("lead vocals"); parts.push(EN.vt[state.vt.id]); }
+    else { parts.push("instrumental, no vocals"); }
+    parts.push(EN.fx[state.fx.id]);
+    if (state.nota) parts.push(EN.nota[state.nota.id]);
+    if (state.makam) parts.push(EN.makam[state.makam.id]);
+    parts.push(EN.mix[state.mix.id]);
+    parts.push(EN.scen[state.scen.id]);
+    parts.push("professional mix and master, clean stereo image");
+    var bpm = bpmOf(state.tempo.opt);
+    var line = parts.join(", ");
+    line += bpm ? ", " + bpm + " bpm" : ", free tempo";
+    return line;
+  }
+
+  function capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function buildLyrics() {
+    var out = [];
+    var l = LYR[state.scen.id];
+    var fxDesc = capFirst(EN.fx[state.fx.id]);
+    if (state.vocal === "yes") {
+      out.push("[Intro] (" + fxDesc + ", fading in)");
+      out.push("");
+      out.push("[Verse 1]");
+      out.push(VOCAL_TAG[state.vt.id]);
+      l.v1.forEach(function (s) { out.push(s); });
+      out.push("");
+      out.push("[Pre-Chorus]");
+      l.pre.forEach(function (s) { out.push(s); });
+      out.push("");
+      out.push("[Chorus]");
+      l.ch.forEach(function (s) { out.push(s); });
+      out.push("");
+      out.push("[Verse 2]");
+      l.v2.forEach(function (s) { out.push(s); });
+      out.push("");
+      out.push("[Bridge]");
+      l.br.forEach(function (s) { out.push(s); });
+      out.push("");
+      out.push("[Chorus]");
+      l.ch.forEach(function (s) { out.push(s); });
+      out.push("");
+      out.push("[Outro]");
+      out.push(l.out);
+      out.push("");
+      out.push("[End - 2:35]");
+    } else {
+      out.push("[Intro] (Deep atmospheric buildup, vinyl crackle)");
+      out.push("");
+      out.push("[Build-Up]");
+      out.push("(" + fxDesc + ", layers entering one by one)");
+      out.push("");
+      out.push("[Main Groove]");
+      out.push("(" + (state.makam ? EN.makam[state.makam.id] : EN.mood[state.mood.id]) + ")");
+      out.push("");
+      out.push("[Break & Drop]");
+      out.push("(Sudden silence, then heavy low-end impact)");
+      out.push("");
+      out.push("[Outro]");
+      out.push("(Slow fade, last loop dissolving)");
+      out.push("");
+      out.push("[End - 2:40]");
+    }
+    return out.join("\n");
+  }
+
+  function buildOutputs() {
+    $("out-style").value = "Sound Prompt:\n" + buildSoundPrompt();
+    $("out-lyrics").value = "Lyrics:\n" + buildLyrics();
+  }
+
+  function fillSummary() {
+    var t = T();
+    var list = $("summary-list");
+    list.innerHTML = "";
+    var rows = [
+      [t.sumGenre, state.genre && titleOf(state.genre.opt)],
+      [t.sumTempo, state.tempo && titleOf(state.tempo.opt)],
+      [t.sumMood, state.mood && titleOf(state.mood.opt)],
+      [t.sumVocal, state.vocal === "yes" ? t.vocalYesShort : (state.vocal === "no" ? t.vocalNoShort : null)],
+      [t.sumVt, state.vocal === "yes" ? (state.vt && titleOf(state.vt.opt)) : t.notRequired],
+      [t.sumFx, state.fx && titleOf(state.fx.opt)],
+      [t.sumMix, state.mix && titleOf(state.mix.opt)],
+      [t.sumScen, state.scen && titleOf(state.scen.opt)],
+      [t.sumMakam, state.makam ? titleOf(state.makam.opt) : t.notSelected],
+      [t.sumNota, state.nota ? titleOf(state.nota.opt) : t.notSelected]
+    ];
+    rows.forEach(function (r) {
+      var li = document.createElement("li");
+      var k = document.createElement("span"); k.className = "k"; k.textContent = r[0] + ": ";
+      li.appendChild(k);
+      li.appendChild(document.createTextNode(r[1] || t.notGiven));
+      list.appendChild(li);
+    });
+  }
+
+  var loaderMsgTimer = null, resultTimer = null;
+
+  function startGeneration() {
+    if (!state.mix || !state.scen) { announce(T().needRequired); return; }
+    showStep(5, true);
+    fillSummary();
+    var res = $("gen-result");
+    res.classList.remove("active"); res.style.display = "none";
+    var loader = $("gen-loader");
+    loader.classList.add("active"); loader.style.display = "block";
+    var msgs = T().loaderMsgs, idx = 0;
+    $("loader-text").textContent = msgs[0];
+    clearInterval(loaderMsgTimer);
+    loaderMsgTimer = setInterval(function () {
+      idx = (idx + 1) % msgs.length;
+      $("loader-text").textContent = msgs[idx];
+    }, 600);
+    announce(T().genSr);
+    clearTimeout(resultTimer);
+    resultTimer = setTimeout(finishGeneration, 1800);
+  }
+
+  function finishGeneration() {
+    clearInterval(loaderMsgTimer);
+    var loader = $("gen-loader");
+    loader.classList.remove("active"); loader.style.display = "none";
+    buildOutputs();
+    var res = $("gen-result");
+    res.style.display = "block";
+    res.classList.add("active");
+    announce(T().promptReady);
+    focusEl($("res-title1"));
+  }
+
+  // ---------- Kopyalama ----------
+  function copyText(text, onDone) {
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      if (ok) onDone(); else announce(T().copyFail);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(onDone, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  var copyTimers = {};
+  function bindCopy(btnId, getText) {
+    var btn = $(btnId);
+    btn.addEventListener("click", function () {
+      copyText(getText(), function () {
+        var label = btn.getAttribute("data-label") || btn.textContent;
+        btn.setAttribute("data-label", label);
+        btn.textContent = T().copied;
+        btn.classList.add("copied");
+        play("copy");
+        announce(T().copiedMsg);
+        clearTimeout(copyTimers[btnId]);
+        copyTimers[btnId] = setTimeout(function () {
+          btn.textContent = btn.getAttribute("data-label");
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+    });
+  }
+  bindCopy("copy-sound", function () { return $("out-style").value; });
+  bindCopy("copy-lyrics", function () { return $("out-lyrics").value; });
+  bindCopy("copy-all", function () { return $("out-style").value + "\n\n" + $("out-lyrics").value; });
+
+  // ---------- Sifirla ----------
+  function resetAll() {
+    state = { genre: null, tempo: null, mood: null, vocal: null, vt: null, fx: null, mix: null, scen: null, makam: null, nota: null };
+    $("vocal-yes").setAttribute("aria-checked", "false");
+    $("vocal-no").setAttribute("aria-checked", "false");
+    $("vt-toggle").disabled = true;
+    $("next-1").hidden = true;
+    $("next-2").disabled = true;
+    $("next-3").disabled = true;
+    $("next-4").disabled = true;
+    $("out-style").value = "";
+    $("out-lyrics").value = "";
+    var res = $("gen-result"); res.style.display = "none"; res.classList.remove("active");
+    var loader = $("gen-loader"); loader.style.display = "none"; loader.classList.remove("active");
+    clearTimeout(resultTimer);
+    clearInterval(loaderMsgTimer);
+    ["copy-sound", "copy-lyrics", "copy-all"].forEach(function (id) {
+      var b = $(id); b.classList.remove("copied");
+      if (b.getAttribute("data-label")) b.textContent = b.getAttribute("data-label");
+    });
+    DD.forEach(function (d) { setOpen(d.p, false, false); renderDropdown(d); });
+    refreshSelectedLines();
+    $("vt-note").textContent = T().vtNoteLocked;
+    $("s2-summary").textContent = "";
+    showStep(1, false);
+    announce(T().resetDone);
+  }
+
+  // ---------- Baglantilar ----------
+  $("next-1").addEventListener("click", function () {
+    if (!state.genre) { announce(T().needGenre); return; }
+    showStep(2, true);
+  });
+  $("next-2").addEventListener("click", function () {
+    if (!state.tempo || !state.mood) { announce(T().needTempoMood); return; }
+    showStep(3, true);
+  });
+  $("next-3").addEventListener("click", function () {
+    if ($("next-3").disabled) { announce(T().needVocal); return; }
+    showStep(4, true);
+  });
+  $("next-4").addEventListener("click", startGeneration);
+  $("reset-btn").addEventListener("click", resetAll);
+  $("back-2").addEventListener("click", function () { showStep(1, true); });
+  $("back-3").addEventListener("click", function () { showStep(2, true); });
+  $("back-4").addEventListener("click", function () { showStep(3, true); });
+  $("back-5").addEventListener("click", function () { showStep(4, true); });
+
+  $("vt-toggle").disabled = true;
+  applyLanguage();
+})();
+</script>
+</body>
+</html>
